@@ -19,14 +19,14 @@ const Room = () => {
 
   const playStop = () => {
     console.log("object");
-    let enabled = myVideoStream.getVideoTracks()[0].enabled;
-    if (enabled) {
-      myVideoStream.getVideoTracks()[0].enabled = false;
-      setPlayVideo();
-    } else {
-      setStopVideo();
-      myVideoStream.getVideoTracks()[0].enabled = true;
-    }
+    // let enabled = myVideoStream.getVideoTracks()[0].enabled;
+    // if (enabled) {
+    //   myVideoStream.getVideoTracks()[0].enabled = false;
+    //   setPlayVideo();
+    // } else {
+    //   setStopVideo();
+    //   myVideoStream.getVideoTracks()[0].enabled = true;
+    // }
   };
 
   const copyId = () => {
