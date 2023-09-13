@@ -1,23 +1,33 @@
-import logo from './logo.svg';
-import './App.css';
+import { useEffect } from 'react';
+import socketIO from 'socket.io-client';
+import { Navbar } from './components/index.js';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { Home, Room } from './pages/index.js';
+import DefaultLayout from './layout/default.jsx';
+import RoomLayout from './layout/roomLayout.jsx';
 
-function App() {
+const webSocket = process.env.REACT_APP_WEBSOCKET_URL;
+
+const App = () => {
+  // useEffect(() => {
+  //   socketIO(webSocket);
+  // }, []);
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<DefaultLayout />}>
+            <Route index exact element={<Home />} />
+            <Route path="/home" element={<Home />} />
+          </Route>
+
+          <Route path="/room/" element={<RoomLayout />}>
+            <Route path=":roomId" element={<Room />} />
+            <Route path="" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
     </div>
   );
 }
