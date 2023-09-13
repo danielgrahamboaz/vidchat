@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Set the name of the branch to push
-BRANCH_NAME="master"
+BRANCH_NAME="main"
 
 # Set the names of the two remote repositories
 REMOTE_1="origin"

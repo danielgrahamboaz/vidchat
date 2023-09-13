@@ -1,7 +1,32 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import videoImg from "../../assets/images/Video.jpg";
+import { v4 as uuid } from "uuid";
+import { useNavigate } from "react-router-dom";
 
 const Home = () => {
+  const [roomId, setRoomId] = useState();
+
+  const navigate = useNavigate();
+
+  const joinRoom = (e) => {
+    e.preventDefault();
+    console.log("roomId: ", roomId);
+
+    navigate(`/room/${roomId}`);
+  };
+
+  const createNewRoom = () => {
+    const roomId_ = uuid();
+
+    console.log("roomId: ", roomId);
+
+    navigate(`/room/${roomId_}`);
+  };
+
+  useEffect(() => {
+    console.log("roomId: ", roomId);
+  }, [roomId]);
+
   return (
     <main class="container bd- main pt-6">
       <div class="columns">
@@ -17,7 +42,7 @@ const Home = () => {
               <p class="title">Quality Video Calls...</p>
               <p class="subtitle">Now Free!</p>
 
-              <form method="POST" action="/join-room">
+              <form onSubmit={(e) => joinRoom(e)}>
                 <div class="columns is-mobile">
                   <div class="column control is-two-thirds">
                     <input
@@ -25,11 +50,19 @@ const Home = () => {
                       type="text"
                       placeholder="Enter Room Id"
                       name="roomId"
+                      value={roomId}
                       required
+                      onChange={(e) => setRoomId(e.target.value)}
                     />
                   </div>
                   <div class="column">
-                    <button class="button is-outlined">Join</button>
+                    <button
+                      type="submit"
+                      class="button is-outlined"
+                      onClick={(e) => joinRoom(e)}
+                    >
+                      Join
+                    </button>
                   </div>
                 </div>
               </form>
@@ -41,7 +74,7 @@ const Home = () => {
               </div>
               <div class="columns is-mobile">
                 <div class="column is-three-quarters is-three-fifths is-offset-1">
-                  <a href="/user/start-call">
+                  <a onClick={createNewRoom}>
                     <button class="button is-black">Create A New Room</button>
                   </a>
                 </div>
