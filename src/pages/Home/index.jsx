@@ -28,25 +28,25 @@ const Home = () => {
   }, [roomId]);
 
   return (
-    <main class="container bd- main pt-6">
-      <div class="columns">
-        <div class="column is-two-thirds pr-6">
-          <figure class="image" id="shadow-card">
+    <main className="container bd- main pt-6">
+      <div className="columns">
+        <div className="column is-two-thirds pr-6">
+          <figure className="image" id="shadow-card">
             <img src={videoImg} />
           </figure>
         </div>
 
-        <div class="column">
-          <div class="card">
-            <div class="card-content">
-              <p class="title">Quality Video Calls...</p>
-              <p class="subtitle">Now Free!</p>
+        <div className="column">
+          <div className="card">
+            <div className="card-content">
+              <p className="title">Quality Video Calls...</p>
+              <p className="subtitle">Now Free!</p>
 
               <form onSubmit={(e) => joinRoom(e)}>
-                <div class="columns is-mobile">
-                  <div class="column control is-two-thirds">
+                <div className="columns is-mobile">
+                  <div className="column control is-two-thirds">
                     <input
-                      class="input is-hovered"
+                      className="input is-hovered"
                       type="text"
                       placeholder="Enter Room Id"
                       name="roomId"
@@ -55,10 +55,10 @@ const Home = () => {
                       onChange={(e) => setRoomId(e.target.value)}
                     />
                   </div>
-                  <div class="column">
+                  <div className="column">
                     <button
                       type="submit"
-                      class="button is-outlined"
+                      className="button is-outlined"
                       onClick={(e) => joinRoom(e)}
                     >
                       Join
@@ -67,19 +67,21 @@ const Home = () => {
                 </div>
               </form>
 
-              <div class="columns is-mobile is-centered">
-                <div class="column is-half">
-                  <p class="bd-notification is-primary ml-2 mb-0"> OR</p>
+              <div className="columns is-mobile is-centered">
+                <div className="column is-half">
+                  <p className="bd-notification is-primary ml-2 mb-0"> OR</p>
                 </div>
               </div>
-              <div class="columns is-mobile">
-                <div class="column is-three-quarters is-three-fifths is-offset-1">
+              <div className="columns is-mobile">
+                <div className="column is-three-quarters is-three-fifths is-offset-1">
                   <a onClick={createNewRoom}>
-                    <button class="button is-black">Create A New Room</button>
+                    <button className="button is-black">
+                      Create A New Room
+                    </button>
                   </a>
                 </div>
-                <div class="column"></div>
-                <div class="column"></div>
+                <div className="column"></div>
+                <div className="column"></div>
               </div>
             </div>
           </div>

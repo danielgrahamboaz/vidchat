@@ -1,10 +1,15 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
-import { useParams, Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import endcall from "../../assets/audio/end-call.mp3";
 import startcall from "../../assets/audio/start-call.mp3";
 
 import "../../styles.css";
+import "../../room.css";
+
+import { constraints, servers } from "../../constants";
+
+import { createChannel, createClient } from "agora-rtm-react";
 
 const Room = () => {
   const params = useParams();
@@ -12,6 +17,21 @@ const Room = () => {
 
   const endAudio = new Audio(endcall);
   const startAudio = new Audio(startcall);
+
+  const userVideo = useRef();
+  const partnerVideo = useRef();
+
+  const useClient = createClient(process.env.REACT_APP_AGORA_APP_ID);
+  let client = useClient();
+
+  let channel;
+  let token = null;
+
+  let localStream;
+  let remoteStream;
+  let peerConnection;
+
+  let uid = String(Math.floor(Math.random() * 10000));
 
   console.log("params: ", params);
 
@@ -59,18 +79,135 @@ const Room = () => {
     <Navigate to="/home" replace />;
   }
 
+  // useChannel(params.roomId, (channel_) => {
+  //   channel = channel_;
+  // });
+
   useEffect(() => {
     startAudio.muted = false;
+
+    const init = async () => {
+      console.log("init params: ", params?.roomId);
+      const channel_ = createChannel(params?.roomId);
+      channel = channel_(client);
+
+      console.log("channellll: ", channel);
+
+      await client.login({ uid, token });
+      await channel.join();
+    };
+
+    init().then(() => {
+      console.log("channel: ", channel);
+
+      channel.on("MemberJoined", handleUserJoined);
+      channel.on("MemberLeft", handleUserLeft);
+
+      client.on("MessageFromPeer", handleMessageFromPeer);
+
+      navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
+        localStream = stream;
+        userVideo.current.srcObject = localStream;
+        userVideo.current.play();
+      });
+    });
 
     // playEntry();
     // startAudio.play();
   }, []);
 
+  const createPeerConnection = async (MemberId) => {
+    peerConnection = new RTCPeerConnection(servers);
+
+    remoteStream = new MediaStream();
+    partnerVideo.current.srcObject = remoteStream;
+    partnerVideo.current.style.display = "block";
+
+    userVideo.current.classList.add("smallFrame");
+
+    if (!localStream) {
+      localStream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      });
+      userVideo.current.srcObject = localStream;
+    }
+
+    localStream.getTracks().forEach((track) => {
+      peerConnection.addTrack(track, localStream);
+    });
+
+    peerConnection.ontrack = (event) => {
+      event.streams[0].getTracks().forEach((track) => {
+        remoteStream.addTrack(track);
+      });
+    };
+
+    peerConnection.onicecandidate = async (event) => {
+      if (event.candidate) {
+        client.sendMessageToPeer(
+          {
+            text: JSON.stringify({
+              type: "candidate",
+              candidate: event.candidate,
+            }),
+          },
+          MemberId
+        );
+      }
+    };
+  };
+
+  const handleUserJoined = async (memberId) => {};
+
+  const handleUserLeft = async (memberId) => {
+    partnerVideo.current.style.display = "none";
+    userVideo.current.classList.remove("smallFrame");
+  };
+
+  const handleMessageFromPeer = async (message, peerId) => {};
+
+  const addAnswer = async (answer) => {
+    if (!peerConnection.currentRemoteDescription) {
+      peerConnection.setRemoteDescription(answer);
+    }
+  };
+
+  const createAnswer = async (MemberId, offer) => {
+    await createPeerConnection(MemberId);
+
+    await peerConnection.setRemoteDescription(offer);
+
+    let answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+
+    client.sendMessageToPeer(
+      { text: JSON.stringify({ type: "answer", answer: answer }) },
+      MemberId
+    );
+  };
+
   return (
     <div className="main">
       <div className="main__left">
         <div className="main__videos">
-          <div id="video-grid"></div>
+          <div id="videos">
+            <video
+              className="video-player"
+              id="user-1"
+              muted
+              autoPlay
+              playsInline
+              ref={userVideo}
+            ></video>
+            <video
+              className="video-player"
+              id="user-2"
+              autoPlay
+              playsInline
+              ref={partnerVideo}
+            ></video>
+          </div>
         </div>
         <div className="main__controls">
           <div className="main__controls__block">
@@ -94,7 +231,7 @@ const Room = () => {
               <input
                 className="copyfrom"
                 type="text"
-                value={params.roomId}
+                defaultValue={params.roomId}
                 id="id_copy"
                 aria-hidden="true"
               />
