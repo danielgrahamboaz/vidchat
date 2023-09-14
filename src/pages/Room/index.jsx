@@ -10,6 +10,12 @@ import "../../room.css";
 import { constraints, servers } from "../../constants";
 
 import { createChannel, createClient } from "agora-rtm-react";
+import {
+  setMuteButton,
+  setPlayVideo,
+  setStopVideo,
+  setUnmuteButton,
+} from "../../utilities";
 
 const Room = () => {
   const params = useParams();
@@ -35,18 +41,22 @@ const Room = () => {
 
   console.log("params: ", params);
 
-  const muteUnmute = () => {};
+  const muteUnmute = () => {
+    let audioTrack = localStream
+      .getTracks()
+      .find((track) => track.kind === "audio");
+
+    if (audioTrack.enabled) {
+      audioTrack.enabled = false;
+      setUnmuteButton();
+    } else {
+      audioTrack.enabled = true;
+      setMuteButton();
+    }
+  };
 
   const playStop = () => {
     console.log("object");
-    // let enabled = myVideoStream.getVideoTracks()[0].enabled;
-    // if (enabled) {
-    //   myVideoStream.getVideoTracks()[0].enabled = false;
-    //   setPlayVideo();
-    // } else {
-    //   setStopVideo();
-    //   myVideoStream.getVideoTracks()[0].enabled = true;
-    // }
 
     let videoTrack = localStream
       .getTracks()
@@ -59,22 +69,6 @@ const Room = () => {
       videoTrack.enabled = true;
       setStopVideo();
     }
-  };
-
-  const setPlayVideo = () => {
-    const html = `
-    <i class="stop fas fa-video-slash"></i>
-      <span>Play Video</span>
-    `;
-    document.querySelector(".main__video_button").innerHTML = html;
-  };
-
-  const setStopVideo = () => {
-    const html = `
-      <i class="fas fa-video"></i>
-      <span>Stop Video</span>
-    `;
-    document.querySelector(".main__video_button").innerHTML = html;
   };
 
   const copyId = () => {
@@ -213,6 +207,11 @@ const Room = () => {
       { text: JSON.stringify({ type: "answer", answer: answer }) },
       MemberId
     );
+  };
+
+  const leaveChannel = async () => {
+    await channel.leave();
+    await client.logout();
   };
 
   return (
