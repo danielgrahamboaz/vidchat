@@ -83,9 +83,16 @@ const Room = () => {
     alert("Copied RoomId: " + copyText.value);
   };
 
-  const exit = () => {
+  const exit = async () => {
     var aud = document.getElementById("end-call");
     aud.play();
+    leaveChannel();
+
+    const tracks = await localStream.getTracks();
+
+    tracks.forEach((track) => {
+      track.stop();
+    });
 
     setTimeout(() => {
       navigate("/");
@@ -113,6 +120,8 @@ const Room = () => {
       const channel_ = createChannel(params?.roomId);
       channel = channel_(client);
 
+      playEntry();
+
       console.log("channellll: ", channel);
 
       await client.login({ uid, token });
@@ -133,6 +142,8 @@ const Room = () => {
         userVideo.current.play();
       });
     });
+
+    window.addEventListener("beforeunload", leaveChannel);
 
     // playEntry();
     // startAudio.play();
@@ -180,19 +191,50 @@ const Room = () => {
     };
   };
 
-  const handleUserJoined = async (memberId) => {};
+  const handleUserJoined = async (MemberId) => {
+    console.log("A new user joined the channel:", MemberId);
+    createOffer(MemberId);
+  };
 
   const handleUserLeft = async (memberId) => {
     partnerVideo.current.style.display = "none";
     userVideo.current.classList.remove("smallFrame");
   };
 
-  const handleMessageFromPeer = async (message, peerId) => {};
+  const handleMessageFromPeer = async (message, MemberId) => {
+    message = JSON.parse(message.text);
+
+    if (message.type === "offer") {
+      createAnswer(MemberId, message.offer);
+    }
+
+    if (message.type === "answer") {
+      addAnswer(message.answer);
+    }
+
+    if (message.type === "candidate") {
+      if (peerConnection) {
+        peerConnection.addIceCandidate(message.candidate);
+      }
+    }
+  };
 
   const addAnswer = async (answer) => {
     if (!peerConnection.currentRemoteDescription) {
       peerConnection.setRemoteDescription(answer);
     }
+  };
+
+  const createOffer = async (MemberId) => {
+    await createPeerConnection(MemberId);
+
+    let offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+
+    client.sendMessageToPeer(
+      { text: JSON.stringify({ type: "offer", offer: offer }) },
+      MemberId
+    );
   };
 
   const createAnswer = async (MemberId, offer) => {
