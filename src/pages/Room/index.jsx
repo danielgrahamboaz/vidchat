@@ -47,6 +47,34 @@ const Room = () => {
     //   setStopVideo();
     //   myVideoStream.getVideoTracks()[0].enabled = true;
     // }
+
+    let videoTrack = localStream
+      .getTracks()
+      .find((track) => track.kind === "video");
+
+    if (videoTrack.enabled) {
+      videoTrack.enabled = false;
+      setPlayVideo();
+    } else {
+      videoTrack.enabled = true;
+      setStopVideo();
+    }
+  };
+
+  const setPlayVideo = () => {
+    const html = `
+    <i class="stop fas fa-video-slash"></i>
+      <span>Play Video</span>
+    `;
+    document.querySelector(".main__video_button").innerHTML = html;
+  };
+
+  const setStopVideo = () => {
+    const html = `
+      <i class="fas fa-video"></i>
+      <span>Stop Video</span>
+    `;
+    document.querySelector(".main__video_button").innerHTML = html;
   };
 
   const copyId = () => {
