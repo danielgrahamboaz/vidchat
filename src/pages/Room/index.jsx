@@ -17,6 +17,8 @@ import {
   setUnmuteButton,
 } from "../../utilities";
 
+import io from "socket.io-client";
+
 const Room = () => {
   const params = useParams();
   const navigate = useNavigate();
@@ -26,14 +28,16 @@ const Room = () => {
 
   const userVideo = useRef();
   const partnerVideo = useRef();
-
-  const useClient = createClient(process.env.REACT_APP_AGORA_APP_ID);
-  let client = useClient();
+  const socketRef = useRef();
+  const otherUser = useRef();
+  const userStream = useRef();
+  const peerRef = useRef();
+  const senders = useRef([]);
 
   let channel;
   let token = null;
 
-  let localStream;
+  // let localStream;
   let remoteStream;
   let peerConnection;
 
@@ -42,7 +46,7 @@ const Room = () => {
   console.log("params: ", params);
 
   const muteUnmute = () => {
-    let audioTrack = localStream
+    let audioTrack = userStream.current
       .getTracks()
       .find((track) => track.kind === "audio");
 
@@ -58,7 +62,7 @@ const Room = () => {
   const playStop = () => {
     console.log("object");
 
-    let videoTrack = localStream
+    let videoTrack = userStream.current
       .getTracks()
       .find((track) => track.kind === "video");
 
@@ -83,12 +87,21 @@ const Room = () => {
     alert("Copied RoomId: " + copyText.value);
   };
 
+  const leaveChannel = async () => {
+    try {
+      userStream.current.getVideoTracks()[0].enabled = false;
+      peerRef.current = null;
+    } catch (error) {
+      console.error(error.message);
+    }
+  };
+
   const exit = async () => {
     var aud = document.getElementById("end-call");
     aud.play();
     leaveChannel();
 
-    const tracks = await localStream.getTracks();
+    const tracks = await userStream.current.getTracks();
 
     tracks.forEach((track) => {
       track.stop();
@@ -108,38 +121,45 @@ const Room = () => {
     <Navigate to="/home" replace />;
   }
 
-  // useChannel(params.roomId, (channel_) => {
-  //   channel = channel_;
-  // });
-
   useEffect(() => {
     startAudio.muted = false;
 
     const init = async () => {
       console.log("init params: ", params?.roomId);
-      const channel_ = createChannel(params?.roomId);
-      channel = channel_(client);
+      // grabbing the room id from the url and then sending it to the socket io server
+      socketRef.current = io.connect(process.env.REACT_APP_WEBSOCKET_URL);
+      socketRef.current.emit("join room", params?.roomId);
 
-      playEntry();
+      // user a is joining
+      socketRef.current.on("other user", (userID) => {
+        callUser(userID);
+        otherUser.current = userID;
+        console.log("other user: ", userID);
+      });
 
-      console.log("channellll: ", channel);
+      // user b is joining
+      socketRef.current.on("user joined", (userID) => {
+        otherUser.current = userID;
+        console.log("user joined: ", userID);
+      });
 
-      await client.login({ uid, token });
-      await channel.join();
+      // calling the function when made an offer
+      socketRef.current.on("offer", handleRecieveCall);
+
+      // sending the answer back to socket
+      socketRef.current.on("answer", handleAnswer);
+
+      // joining the user after receiving offer
+      socketRef.current.on("ice-candidate", handleNewICECandidateMsg);
     };
 
     init().then(() => {
-      console.log("channel: ", channel);
-
-      channel.on("MemberJoined", handleUserJoined);
-      channel.on("MemberLeft", handleUserLeft);
-
-      client.on("MessageFromPeer", handleMessageFromPeer);
-
       navigator.mediaDevices.getUserMedia(constraints).then((stream) => {
-        localStream = stream;
-        userVideo.current.srcObject = localStream;
-        userVideo.current.play();
+        userStream.current = stream;
+        userVideo.current.srcObject = stream;
+        // userVideo.current.play();
+
+        playEntry();
       });
     });
 
@@ -149,111 +169,140 @@ const Room = () => {
     // startAudio.play();
   }, []);
 
+  const callUser = async (userID) => {
+    // taking the peer ID
+    peerRef.current = await createPeerConnection(userID);
+
+    // streaming the user a stream
+    // giving access to our peer of our individual stream
+    // storing all the objects sent by the user into the senders array
+    userStream.current
+      .getTracks()
+      .forEach((track) =>
+        senders.current.push(
+          peerRef.current.addTrack(track, userStream.current)
+        )
+      );
+  };
+
   const createPeerConnection = async (MemberId) => {
+    // taking the peer ID
     peerConnection = new RTCPeerConnection(servers);
 
     remoteStream = new MediaStream();
-    partnerVideo.current.srcObject = remoteStream;
+    // partnerVideo.current.srcObject = remoteStream;
     partnerVideo.current.style.display = "block";
 
     userVideo.current.classList.add("smallFrame");
 
-    if (!localStream) {
-      localStream = await navigator.mediaDevices.getUserMedia({
+    if (!userStream.current) {
+      userStream.current = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: false,
       });
-      userVideo.current.srcObject = localStream;
+      userVideo.current.srcObject = userStream.current;
     }
-
-    localStream.getTracks().forEach((track) => {
-      peerConnection.addTrack(track, localStream);
-    });
-
-    peerConnection.ontrack = (event) => {
-      event.streams[0].getTracks().forEach((track) => {
-        remoteStream.addTrack(track);
-      });
-    };
 
     peerConnection.onicecandidate = async (event) => {
       if (event.candidate) {
-        client.sendMessageToPeer(
-          {
-            text: JSON.stringify({
-              type: "candidate",
-              candidate: event.candidate,
-            }),
-          },
-          MemberId
-        );
+        console.log("ice candidate found: ", event.candidate);
+        const payload = {
+          target: otherUser.current,
+          candidate: event.candidate,
+        };
+        socketRef.current.emit("ice-candidate", payload);
       }
     };
+
+    peerConnection.ontrack = (event) => {
+      partnerVideo.current.srcObject = event.streams[0];
+
+      event.streams[0].getTracks().forEach((track) => {
+        // remoteStream.addTrack(track);
+        console.log("remote stream track: ", track);
+      });
+    };
+
+    peerConnection.onnegotiationneeded = () =>
+      handleNegotiationNeededEvent(MemberId);
+
+    return peerConnection;
   };
 
-  const handleUserJoined = async (MemberId) => {
-    console.log("A new user joined the channel:", MemberId);
-    createOffer(MemberId);
+  // making the call
+  // when the actual offer is created, it is then sent to the other user
+  const handleNegotiationNeededEvent = (userID) => {
+    peerRef.current
+      .createOffer()
+      .then((offer) => {
+        // setting the local description from the users offer
+        console.log("local description: ", offer);
+        return peerRef.current.setLocalDescription(offer);
+      })
+      .then(() => {
+        // the person we are trying to make the offer to
+        const payload = {
+          target: userID,
+          caller: socketRef.current.id,
+          sdp: peerRef.current.localDescription,
+        };
+        console.log("remote peer payload: ", payload);
+        socketRef.current.emit("offer", payload);
+      })
+      .catch((e) => console.log(e));
   };
 
-  const handleUserLeft = async (memberId) => {
-    partnerVideo.current.style.display = "none";
-    userVideo.current.classList.remove("smallFrame");
+  // recieving the call
+  const handleRecieveCall = async (incoming) => {
+    peerRef.current = await createPeerConnection();
+
+    // remote description
+    const desc = new RTCSessionDescription(incoming.sdp);
+
+    // setting remote description and attaching the stream
+    peerRef.current
+      .setRemoteDescription(desc)
+      .then(() => {
+        userStream.current
+          .getTracks()
+          .forEach((track) =>
+            peerRef.current.addTrack(track, userStream.current)
+          );
+      })
+      .then(() => {
+        // creating the answer
+        const answer_ = peerRef.current.createAnswer();
+        console.log("created answer: ", answer_);
+        return answer_;
+      })
+      .then((answer) => {
+        // setting local description
+        const localDesc = peerRef.current.setLocalDescription(answer);
+        console.log("local description: ", localDesc);
+        return localDesc;
+      })
+      .then(() => {
+        // sending data back to the caller
+        const payload = {
+          target: incoming.caller,
+          caller: socketRef.current.id,
+          sdp: peerRef.current.localDescription,
+        };
+        console.log("sending data to caller: ", payload);
+        socketRef.current.emit("answer", payload);
+      });
   };
 
-  const handleMessageFromPeer = async (message, MemberId) => {
-    message = JSON.parse(message.text);
-
-    if (message.type === "offer") {
-      createAnswer(MemberId, message.offer);
-    }
-
-    if (message.type === "answer") {
-      addAnswer(message.answer);
-    }
-
-    if (message.type === "candidate") {
-      if (peerConnection) {
-        peerConnection.addIceCandidate(message.candidate);
-      }
-    }
+  // function to handle the answer which the user a (who created the call) is receiving
+  const handleAnswer = (message) => {
+    const desc = new RTCSessionDescription(message.sdp);
+    peerRef.current.setRemoteDescription(desc).catch((e) => console.log(e));
   };
 
-  const addAnswer = async (answer) => {
-    if (!peerConnection.currentRemoteDescription) {
-      peerConnection.setRemoteDescription(answer);
-    }
-  };
-
-  const createOffer = async (MemberId) => {
-    await createPeerConnection(MemberId);
-
-    let offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
-
-    client.sendMessageToPeer(
-      { text: JSON.stringify({ type: "offer", offer: offer }) },
-      MemberId
-    );
-  };
-
-  const createAnswer = async (MemberId, offer) => {
-    await createPeerConnection(MemberId);
-
-    await peerConnection.setRemoteDescription(offer);
-
-    let answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer);
-
-    client.sendMessageToPeer(
-      { text: JSON.stringify({ type: "answer", answer: answer }) },
-      MemberId
-    );
-  };
-
-  const leaveChannel = async () => {
-    await channel.leave();
-    await client.logout();
+  // swapping candidates until they reach on an agreement
+  const handleNewICECandidateMsg = (incoming) => {
+    const candidate = new RTCIceCandidate(incoming);
+    peerRef.current.addIceCandidate(candidate).catch((e) => console.log(e));
   };
 
   return (
