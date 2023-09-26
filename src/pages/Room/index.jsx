@@ -127,7 +127,11 @@ const Room = () => {
     const init = async () => {
       console.log("init params: ", params?.roomId);
       // grabbing the room id from the url and then sending it to the socket io server
-      socketRef.current = io.connect(process.env.REACT_APP_WEBSOCKET_URL);
+      socketRef.current = io.connect(
+        !process.env.NODE_ENV
+          ? process.env.REACT_APP_WEBSOCKET_URL
+          : process.env.REACT_APP_WEBSOCKET_URL_PROD
+      );
       socketRef.current.emit("join room", params?.roomId);
 
       // user a is joining
