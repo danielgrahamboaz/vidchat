@@ -128,9 +128,9 @@ const Room = () => {
       console.log("init params: ", params?.roomId);
       // grabbing the room id from the url and then sending it to the socket io server
       socketRef.current = io.connect(
-        !process.env.NODE_ENV
-          ? process.env.REACT_APP_WEBSOCKET_URL
-          : process.env.REACT_APP_WEBSOCKET_URL_PROD
+        // !process.env.NODE_ENV
+        process.env.REACT_APP_WEBSOCKET_URL
+        // process.env.REACT_APP_WEBSOCKET_URL_PROD
       );
       socketRef.current.emit("join room", params?.roomId);
 
@@ -219,10 +219,11 @@ const Room = () => {
     };
 
     peerConnection.ontrack = (event) => {
+      console.log("on track: ", event.streams[0]);
       partnerVideo.current.srcObject = event.streams[0];
 
       event.streams[0].getTracks().forEach((track) => {
-        // remoteStream.addTrack(track);
+        remoteStream.addTrack(track);
         console.log("remote stream track: ", track);
       });
     };
@@ -353,7 +354,7 @@ const Room = () => {
               <input
                 className="copyfrom"
                 type="text"
-                defaultValue={params.roomId}
+                defaultValue={params?.roomId}
                 id="id_copy"
                 aria-hidden="true"
               />
